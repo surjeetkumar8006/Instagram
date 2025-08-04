@@ -1,10 +1,10 @@
-PORT = {port number}
-Mongo_URI= {your mongo uri}
-JWT_Secret= {jwt secret}
-JWT_Refresh_Secret= {jwt refresh secret}
+PORT=3002
+MONGO_URI=mongodb://localhost:27017/instagram
+JWT_SECRET=someverysecretstring
+JWT_REFRESH_SECRET=someothersecretstring
 CLIENT_URL=http://localhost:3000
 email=userzyx01@xyz.com
 password=1skjsnksdsd
-clientid={google auth cclientid}
-clientsecret={google auth client secret}
+clientid=google-client-id-here
+clientsecret=google-client-secret-here
 redirect_url=http://localhost:8000/auth/google/oauth
