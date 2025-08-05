@@ -130,8 +130,16 @@ exports.logout = async (req, res) => {
 
 exports.googleoauth = async (req, res) => {
   try {
-    const { id_token, access_token } = await getUserFromCode(req.query.code);
+    const tokenData = await getUserFromCode(req.query.code);
+
+    if (!tokenData || !tokenData.id_token || !tokenData.access_token) {
+      return res.status(400).send("Failed to get tokens from Google");
+    }
+
+    const { id_token, access_token } = tokenData;
+
     const user = await userDetails(access_token, id_token);
+
     let isUser = await User.findOne({ email: user.email });
     if (!isUser) {
       const temp = new User({
@@ -140,46 +148,43 @@ exports.googleoauth = async (req, res) => {
         email: user.email,
         avatar: user.picture,
       });
-      isUser = temp.save();
+      isUser = await temp.save(); // ✅ Add `await` here
     }
+
     const access_token_server = jwt.sign(
       { _id: isUser._id },
-      process.env.JWT_Secret,
-      {
-        expiresIn: "30m",
-      }
+      process.env.JWT_SECRET,
+      { expiresIn: "30m" }
     );
+
     const refresh_token_server = jwt.sign(
       { _id: isUser._id },
-      process.env.JWT_Refresh_Secret
+      process.env.JWT_REFRESH_SECRET
     );
-    const refToken = new Token({
-      token: refresh_token_server,
-    });
+
+    const refToken = new Token({ token: refresh_token_server });
     await refToken.save();
-    const options = {
-      success: true,
-      access_token_server,
-      refresh_token_server,
-    };
+
     res.redirect(
       `${process.env.CLIENT_URL}/oauth/redirect?uid=${isUser._id}&access_token=${access_token_server}&refresh_token=${refresh_token_server}`
     );
   } catch (err) {
-    console.log(err);
-    res.send("Something unexpected happened.");
+    console.error("OAuth Error:", err.message);
+    res.status(500).send("Something unexpected happened.");
   }
 };
 
+
 async function getUserFromCode(code) {
   const url = "https://oauth2.googleapis.com/token";
-  const values = {
-    code,
-    client_id: process.env.clientid,
-    client_secret: process.env.clientsecret,
-    redirect_uri: process.env.redirect_url,
-    grant_type: "authorization_code",
-  };
+ const values = {
+  code,
+  client_id: process.env.GOOGLE_CLIENT_ID,
+  client_secret: process.env.GOOGLE_CLIENT_SECRET,
+  redirect_uri: process.env.REDIRECT_URL,
+  grant_type: "authorization_code",
+};
+
 
   try {
     const res = await axios.post(url, qs.stringify(values), {
@@ -189,10 +194,11 @@ async function getUserFromCode(code) {
     });
     return res.data;
   } catch (error) {
-    console.error(error);
-    // throw new Error(error);
+    console.error("Error exchanging code for token:", error.response?.data || error.message);
+    throw new Error("Failed to get token from Google.");
   }
 }
+
 
 async function userDetails(access_token, id_token) {
   return axios
